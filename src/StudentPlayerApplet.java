@@ -3,7 +3,6 @@ import java.applet.Applet;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
-import java.util.Arrays;
 
 class Player extends Panel implements Runnable {
     private static final long serialVersionUID = 1L;
@@ -22,9 +21,11 @@ class Player extends Panel implements Runnable {
     private AudioFormat format;
     private DataLine.Info info;
     private boolean ready = false;
-    private float length;
+    private int length;
     private int oneSecond;
     private BoundedBuffer buffer;
+
+    private boolean paused = false;
 
     public Player(String filename){
 
@@ -48,16 +49,25 @@ class Player extends Panel implements Runnable {
                 }
                 if(e.getActionCommand().toString().equals("p"))
                 {
-                    textarea.append("Paused Audio \n");
-                    textfield.setText("");
-                    //TODO Pause Playback
+
+                    //TODO Tidy Pause Method
+                    if(!paused)
+                    {
+                        textarea.append("Pausing Audio \n");
+                        textfield.setText("");
+                        paused = true;
+                    }
 
                 }
                 else if(e.getActionCommand().toString().equals("r"))
                 {
-                    textarea.append("Resumed Audio \n");
-                    textfield.setText("");
-                    //TODO Resume Playback
+                    //TODO Tidy Resume Method
+                    if(paused)
+                    {
+                        textarea.append("Resumed Audio \n");
+                        textfield.setText("");
+                        resume();
+                    }
 
                 }
                 else if(e.getActionCommand().toString().equals("q"))
@@ -88,7 +98,6 @@ class Player extends Panel implements Runnable {
                 {
                     textarea.append("Invalid command \n");
                     textfield.setText("");
-                    //TODO Unmute Playback
                 }
 
             }
@@ -98,11 +107,25 @@ class Player extends Panel implements Runnable {
         new Thread(this).start();
     }
 
+    //Require Synchronized method to notify threads of change
+    public synchronized void resume()
+    {
+        try
+        {
+            paused = false;
+            notifyAll();
+        }
+        catch (Exception e)
+        {
+
+        }
+    }
+
     public void run() {
 
         try {
             File file = new File(filename);
-            length = file.length();
+            length = (int)file.length();
             s = AudioSystem.getAudioInputStream(file);
             format = s.getFormat();
             System.out.println("Audio format: " + format.toString());
@@ -151,14 +174,14 @@ class Player extends Panel implements Runnable {
             while(ready)
                 wait();
 
-            int tmp = s.read(audioBuffer);
+            bytesRead = s.read(audioBuffer);
             //Once we get this we're done playing audio
-            if(tmp == -1)
+            if(bytesRead == -1)
             {
                 return;
             }
 
-            buffer.insertChunk(tmp);
+            buffer.insertChunk(bytesRead);
 
             ready = true;
             notifyAll();
@@ -181,6 +204,9 @@ class Player extends Panel implements Runnable {
         {
             //TODO allow the writeAudio to do something in the background
             while (!ready)
+                wait();
+
+            while(paused)
                 wait();
 
             //Once we get this we're done reading audio
@@ -207,9 +233,10 @@ class Player extends Panel implements Runnable {
     {
         synchronized public void run()
         {
-            for(float i = 0; i < length; i += (float)oneSecond) {
+            for(int i = 0; i < length; i += oneSecond) {
                 readAudio();
             }
+            System.out.println("Done reading from file");
         }
     }
 
@@ -223,10 +250,10 @@ class Player extends Panel implements Runnable {
                 line.open(format);
                 line.start();
 
-                for(float i = 0; i < length; i += (float)oneSecond) {
+                for(int i = 0; i < length; i += oneSecond) {
                     writeAudio();
                 }
-                System.out.println("Done");
+                System.out.println("Done writing to device");
 
                 line.drain();
                 line.stop();
@@ -245,7 +272,7 @@ class Player extends Panel implements Runnable {
     {
         int nextIn = 0;
         int nextOut = 0;
-        int size ;
+        int size;
         int occupied = 0;
         int ins;
         int outs;
@@ -261,6 +288,7 @@ class Player extends Panel implements Runnable {
 
         synchronized void insertChunk(int data)
         {
+            System.out.println("Inserted at " + nextIn + " and occupied is " + occupied);
             try {
                 while (occupied == 10) wait();
 
@@ -268,10 +296,13 @@ class Player extends Panel implements Runnable {
                 nextIn++;
                 if(nextIn == 10) nextIn %= 10;
                 occupied++;
+                notifyAll();
             }
             catch (InterruptedException e)
             {
-
+                System.out.println("Thread Interrupted Exception");
+                e.printStackTrace();
+                System.exit(1);
             }
 
 
@@ -280,6 +311,7 @@ class Player extends Panel implements Runnable {
         synchronized int removeChunk()
         {
             outs = 0;
+            System.out.println("Removed at " + nextOut + " and occupied is " + occupied);
             try
             {
                 while (occupied == 0) wait();
@@ -288,11 +320,14 @@ class Player extends Panel implements Runnable {
                 nextOut++;
                 if(nextOut == 10) nextOut %= 10;
                 occupied--;
+                notifyAll();
             }
 
             catch (InterruptedException e)
             {
-
+                System.out.println("Thread Interrupted Exception");
+                e.printStackTrace();
+                System.exit(1);
             }
             return outs;
         }
