@@ -24,6 +24,11 @@ class Player extends Panel implements Runnable {
     private int length;
     private int oneSecond;
     private BoundedBuffer buffer;
+    private FloatControl volume;
+    float volumeMin;
+    float volumeMax;
+    float newVolume;
+    float currentVolume;
 
     private boolean paused = false;
 
@@ -72,34 +77,41 @@ class Player extends Panel implements Runnable {
                 }
                 else if(e.getActionCommand().toString().equals("q"))
                 {
-                    textarea.append("Raised Volume \n");
                     textfield.setText("");
-                    //TODO Raise Volume
+                    newVolume = volume.getValue() + 1F;
+                    if(newVolume < volumeMax) {
+                        volume.setValue(newVolume);
+                        textarea.append("Raised Volume \n");
+                    }
+                    else {
+                        textarea.append("Max Volume! \n");
+                    }
                 }
                 else if(e.getActionCommand().toString().equals("a"))
                 {
-                    textarea.append("Lowered Volume \n");
                     textfield.setText("");
-                    //TODO Lower Volume
+                    newVolume = volume.getValue() - 1F;
+                    if(newVolume > volumeMin) {
+                        volume.setValue(newVolume);
+                        textarea.append("Lowered Volume \n");
+                    }
+                    else {
+                        textarea.append("Min Volume! \n");
+                    }
                 }
                 else if(e.getActionCommand().toString().equals("m"))
                 {
+                    currentVolume = volume.getValue();
+                    volume.setValue(volumeMin);
                     textarea.append("Muted Audio \n");
                     textfield.setText("");
-                    //TODO Mute Playback
                 }
                 else if(e.getActionCommand().toString().equals("u"))
                 {
+                    volume.setValue(currentVolume);
                     textarea.append("Unmuted Audio \n");
                     textfield.setText("");
-                    //TODO Unmute Playback
                 }
-                else
-                {
-                    textarea.append("Invalid command \n");
-                    textfield.setText("");
-                }
-
             }
         });
 
@@ -134,6 +146,7 @@ class Player extends Panel implements Runnable {
             if (!AudioSystem.isLineSupported(info)) {
                 throw new UnsupportedAudioFileException();
             }
+
 
             oneSecond = (int) (format.getChannels() * format.getSampleRate() *
                     format.getSampleSizeInBits() / 8);
@@ -248,6 +261,9 @@ class Player extends Panel implements Runnable {
             {
                 line = (SourceDataLine) AudioSystem.getLine(info);
                 line.open(format);
+                volume = (FloatControl) line.getControl(FloatControl.Type.MASTER_GAIN);
+                volumeMax = volume.getMaximum();
+                volumeMin = volume.getMinimum();
                 line.start();
 
                 for(int i = 0; i < length; i += oneSecond) {
@@ -288,7 +304,7 @@ class Player extends Panel implements Runnable {
 
         synchronized void insertChunk(int data)
         {
-            System.out.println("Inserted at " + nextIn + " and occupied is " + occupied);
+            //System.out.println("Inserted at " + nextIn + " and occupied is " + occupied);
             try {
                 while (occupied == 10) wait();
 
@@ -311,7 +327,7 @@ class Player extends Panel implements Runnable {
         synchronized int removeChunk()
         {
             outs = 0;
-            System.out.println("Removed at " + nextOut + " and occupied is " + occupied);
+            //System.out.println("Removed at " + nextOut + " and occupied is " + occupied);
             try
             {
                 while (occupied == 0) wait();
