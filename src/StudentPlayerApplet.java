@@ -3,6 +3,7 @@ import java.applet.Applet;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
+import java.util.Arrays;
 
 class Player extends Panel implements Runnable {
     private static final long serialVersionUID = 1L;
@@ -11,14 +12,19 @@ class Player extends Panel implements Runnable {
     private Font font;
     private String filename;
 
+    Thread producer;
+    Thread consumer;
+
+    private SourceDataLine line;
     private byte[] audioBuffer;
     private AudioInputStream s;
     private int bytesRead;
     private AudioFormat format;
     private DataLine.Info info;
     private boolean ready = false;
-
-
+    private float length;
+    private int oneSecond;
+    private BoundedBuffer buffer;
 
     public Player(String filename){
 
@@ -45,12 +51,14 @@ class Player extends Panel implements Runnable {
                     textarea.append("Paused Audio \n");
                     textfield.setText("");
                     //TODO Pause Playback
+
                 }
                 else if(e.getActionCommand().toString().equals("r"))
                 {
                     textarea.append("Resumed Audio \n");
                     textfield.setText("");
                     //TODO Resume Playback
+
                 }
                 else if(e.getActionCommand().toString().equals("q"))
                 {
@@ -93,7 +101,9 @@ class Player extends Panel implements Runnable {
     public void run() {
 
         try {
-            s = AudioSystem.getAudioInputStream(new File(filename));
+            File file = new File(filename);
+            length = file.length();
+            s = AudioSystem.getAudioInputStream(file);
             format = s.getFormat();
             System.out.println("Audio format: " + format.toString());
 
@@ -102,15 +112,17 @@ class Player extends Panel implements Runnable {
                 throw new UnsupportedAudioFileException();
             }
 
-            int oneSecond = (int) (format.getChannels() * format.getSampleRate() *
+            oneSecond = (int) (format.getChannels() * format.getSampleRate() *
                     format.getSampleSizeInBits() / 8);
+            buffer = new BoundedBuffer(oneSecond * 10);
             audioBuffer = new byte[oneSecond];
 
             //Once Audio format, readers and writers setup start the threads
-            Thread producer = new Thread(new Producer());
-            Thread consumer = new Thread(new Consumer());
+            producer = new Thread(new Producer());
+            consumer = new Thread(new Consumer());
             producer.start();
             consumer.start();
+
             producer.join();
             consumer.join();
 
@@ -135,25 +147,22 @@ class Player extends Panel implements Runnable {
     {
         try
         {
-            while(true)
+            //TODO allow the readAudio to do something in the background
+            while(ready)
+                wait();
+
+            int tmp = s.read(audioBuffer);
+            //Once we get this we're done playing audio
+            if(tmp == -1)
             {
-                //TODO allow the readAudio to do something in the background
-                while(ready)
-                    wait();
-
-                bytesRead = s.read(audioBuffer);
-
-                //Once we get this we're done playing audio
-                if(bytesRead == -1)
-                {
-                    break;
-                }
-                ready = true;
-                notifyAll();
+                return;
             }
-            s.close();
+
+            buffer.insertChunk(tmp);
+
             ready = true;
             notifyAll();
+            return;
         }
 
         catch (InterruptedException e)
@@ -170,43 +179,25 @@ class Player extends Panel implements Runnable {
     {
         try
         {
-            SourceDataLine line = (SourceDataLine) AudioSystem.getLine(info);
-            line.open(format);
-            line.start();
+            //TODO allow the writeAudio to do something in the background
+            while (!ready)
+                wait();
 
-            while(true)
+            //Once we get this we're done reading audio
+            if(bytesRead == -1)
             {
-                //TODO allow the writeAudio to do something in the background
-                while (!ready)
-                    wait();
-
-                //Once we get this we're done reading audio
-                if(bytesRead == -1)
-                {
-                    break;
-                }
-
-                line.write(audioBuffer, 0, bytesRead);
-
-                ready = false;
-                notifyAll();
+                return;
             }
 
-            line.drain();
-            line.stop();
-            line.close();
-        }
+            line.write(audioBuffer, 0, buffer.removeChunk());
 
-        catch (LineUnavailableException e)
-        {
-            System.out.println("Player initialisation failed");
-            e.printStackTrace();
-            System.exit(1);
+            ready = false;
+            notifyAll();
+            return;
         }
-
         catch (InterruptedException e)
         {
-            System.out.println("Thread Interupted Exception");
+            System.out.println("Thread Interrupted Exception");
             e.printStackTrace();
             System.exit(1);
         }
@@ -216,7 +207,9 @@ class Player extends Panel implements Runnable {
     {
         synchronized public void run()
         {
-            readAudio();
+            for(float i = 0; i < length; i += (float)oneSecond) {
+                readAudio();
+            }
         }
     }
 
@@ -224,7 +217,84 @@ class Player extends Panel implements Runnable {
     {
         synchronized public void run()
         {
-            writeAudio();
+            try
+            {
+                line = (SourceDataLine) AudioSystem.getLine(info);
+                line.open(format);
+                line.start();
+
+                for(float i = 0; i < length; i += (float)oneSecond) {
+                    writeAudio();
+                }
+                System.out.println("Done");
+
+                line.drain();
+                line.stop();
+                line.close();
+            }
+            catch (LineUnavailableException e)
+            {
+                System.out.println("Player initialisation failed");
+                e.printStackTrace();
+                System.exit(1);
+            }
+        }
+    }
+
+    private class BoundedBuffer
+    {
+        int nextIn = 0;
+        int nextOut = 0;
+        int size ;
+        int occupied = 0;
+        int ins;
+        int outs;
+        boolean dataAvailable;
+        boolean roomAvailable;
+        int [] bufferArray;
+
+        BoundedBuffer(int size)
+        {
+            bufferArray = new int[10];
+            this.size = size;
+        }
+
+        synchronized void insertChunk(int data)
+        {
+            try {
+                while (occupied == 10) wait();
+
+                bufferArray[nextIn] = data;
+                nextIn++;
+                if(nextIn == 10) nextIn %= 10;
+                occupied++;
+            }
+            catch (InterruptedException e)
+            {
+
+            }
+
+
+        }
+
+        synchronized int removeChunk()
+        {
+            outs = 0;
+            try
+            {
+                while (occupied == 0) wait();
+
+                outs = bufferArray[nextOut];
+                nextOut++;
+                if(nextOut == 10) nextOut %= 10;
+                occupied--;
+            }
+
+            catch (InterruptedException e)
+            {
+
+            }
+            return outs;
         }
     }
 }
