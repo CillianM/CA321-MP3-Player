@@ -4,27 +4,21 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 
-public class StudentPlayerApplet extends Applet
-{
-    private static final long serialVersionUID = 1L;
-    public void init() {
-        setLayout(new BorderLayout());
-        add(BorderLayout.CENTER, new Player(getParameter("file")));
-    }
-}
-
 class Player extends Panel implements Runnable {
     private static final long serialVersionUID = 1L;
     private TextField textfield;
     private TextArea textarea;
     private Font font;
     private String filename;
-    byte[][] audioBuffer;
-    AudioInputStream s;
-    int bytesRead;
-    AudioFormat format;
-    DataLine.Info info;
-    boolean ready = false;
+
+    private byte[] audioBuffer;
+    private AudioInputStream s;
+    private int bytesRead;
+    private AudioFormat format;
+    private DataLine.Info info;
+    private boolean ready = false;
+
+
 
     public Player(String filename){
 
@@ -39,48 +33,56 @@ class Player extends Panel implements Runnable {
 
         textfield.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
+
                 if(e.getActionCommand().toString().equals("x"))
                 {
-                    textarea.append("Shutting Down..");
+                    textarea.append("Shutting Down.. \n");
                     textfield.setText("");
                     //TODO GRACEFULLY SHUT DOWN PROGRAMME
                 }
                 if(e.getActionCommand().toString().equals("p"))
                 {
-                    textarea.append("Paused Audio");
+                    textarea.append("Paused Audio \n");
                     textfield.setText("");
                     //TODO Pause Playback
                 }
                 else if(e.getActionCommand().toString().equals("r"))
                 {
-                    textarea.append("Resumed Audio");
+                    textarea.append("Resumed Audio \n");
                     textfield.setText("");
                     //TODO Resume Playback
                 }
                 else if(e.getActionCommand().toString().equals("q"))
                 {
-                    textarea.append("Raised Volume");
+                    textarea.append("Raised Volume \n");
                     textfield.setText("");
                     //TODO Raise Volume
                 }
                 else if(e.getActionCommand().toString().equals("a"))
                 {
-                    textarea.append("Lowered Volume");
+                    textarea.append("Lowered Volume \n");
                     textfield.setText("");
                     //TODO Lower Volume
                 }
                 else if(e.getActionCommand().toString().equals("m"))
                 {
-                    textarea.append("Muted Audio");
+                    textarea.append("Muted Audio \n");
                     textfield.setText("");
                     //TODO Mute Playback
                 }
                 else if(e.getActionCommand().toString().equals("u"))
                 {
-                    textarea.append("Unmuted Audio");
+                    textarea.append("Unmuted Audio \n");
                     textfield.setText("");
                     //TODO Unmute Playback
                 }
+                else
+                {
+                    textarea.append("Invalid command \n");
+                    textfield.setText("");
+                    //TODO Unmute Playback
+                }
+
             }
         });
 
@@ -102,15 +104,15 @@ class Player extends Panel implements Runnable {
 
             int oneSecond = (int) (format.getChannels() * format.getSampleRate() *
                     format.getSampleSizeInBits() / 8);
-            audioBuffer = new byte[10][oneSecond];
+            audioBuffer = new byte[oneSecond];
 
+            //Once Audio format, readers and writers setup start the threads
             Thread producer = new Thread(new Producer());
             Thread consumer = new Thread(new Consumer());
             producer.start();
             consumer.start();
             producer.join();
             consumer.join();
-            System.out.println("Finished Playing");
 
         } catch (UnsupportedAudioFileException e ) {
             System.out.println("Player initialisation failed");
@@ -129,22 +131,27 @@ class Player extends Panel implements Runnable {
         }
     }
 
-    synchronized public void readAudio()
+    public synchronized void readAudio()
     {
         try
         {
             while(true)
             {
+                //TODO allow the readAudio to do something in the background
                 while(ready)
                     wait();
 
-                bytesRead = s.read(audioBuffer[0]);
-                if(bytesRead == -1) {
+                bytesRead = s.read(audioBuffer);
+
+                //Once we get this we're done playing audio
+                if(bytesRead == -1)
+                {
                     break;
                 }
                 ready = true;
                 notifyAll();
             }
+            s.close();
             ready = true;
             notifyAll();
         }
@@ -156,13 +163,10 @@ class Player extends Panel implements Runnable {
             System.exit(1);
         }
 
-        catch (Exception e)
-        {
-
-        }
+        catch (Exception e) {}
     }
 
-    synchronized public void writeAudio()
+    public synchronized void writeAudio()
     {
         try
         {
@@ -172,16 +176,20 @@ class Player extends Panel implements Runnable {
 
             while(true)
             {
+                //TODO allow the writeAudio to do something in the background
                 while (!ready)
                     wait();
 
+                //Once we get this we're done reading audio
                 if(bytesRead == -1)
+                {
                     break;
-                line.write(audioBuffer[0], 0, bytesRead);
+                }
+
+                line.write(audioBuffer, 0, bytesRead);
 
                 ready = false;
                 notifyAll();
-
             }
 
             line.drain();
@@ -189,11 +197,13 @@ class Player extends Panel implements Runnable {
             line.close();
         }
 
-        catch (LineUnavailableException e) {
+        catch (LineUnavailableException e)
+        {
             System.out.println("Player initialisation failed");
             e.printStackTrace();
             System.exit(1);
         }
+
         catch (InterruptedException e)
         {
             System.out.println("Thread Interupted Exception");
@@ -206,7 +216,7 @@ class Player extends Panel implements Runnable {
     {
         synchronized public void run()
         {
-           readAudio();
+            readAudio();
         }
     }
 
@@ -214,13 +224,17 @@ class Player extends Panel implements Runnable {
     {
         synchronized public void run()
         {
-           writeAudio();
+            writeAudio();
         }
     }
 }
 
-
-
-
-
+public class StudentPlayerApplet extends Applet
+{
+    private static final long serialVersionUID = 1L;
+    public void init() {
+        setLayout(new BorderLayout());
+        add(BorderLayout.CENTER, new Player(getParameter("file")));
+    }
+}
 
