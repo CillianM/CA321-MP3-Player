@@ -21,6 +21,7 @@ class Player extends Panel implements Runnable {
     private AudioFormat format;
     private DataLine.Info info;
     private boolean ready = false;
+    private boolean done = false;
     private int length;
     private int oneSecond;
     private BoundedBuffer buffer;
@@ -48,6 +49,7 @@ class Player extends Panel implements Runnable {
 
                 if(e.getActionCommand().toString().equals("x"))
                 {
+                    done = true;
                     textarea.append("Shutting Down.. \n");
                     textfield.setText("");
                     //TODO GRACEFULLY SHUT DOWN PROGRAMME
@@ -161,6 +163,8 @@ class Player extends Panel implements Runnable {
 
             producer.join();
             consumer.join();
+            textarea.append("Threads Joined \n");
+
 
         } catch (UnsupportedAudioFileException e ) {
             System.out.println("Player initialisation failed");
@@ -179,10 +183,13 @@ class Player extends Panel implements Runnable {
         }
     }
 
-    public synchronized void readAudio()
+    public synchronized boolean readAudio()
     {
         try
         {
+            if(done)
+                return false;
+
             //TODO allow the readAudio to do something in the background
             while(ready)
                 wait();
@@ -191,14 +198,14 @@ class Player extends Panel implements Runnable {
             //Once we get this we're done playing audio
             if(bytesRead == -1)
             {
-                return;
+                return false;
             }
 
             buffer.insertChunk(bytesRead);
 
             ready = true;
             notifyAll();
-            return;
+            return true;
         }
 
         catch (InterruptedException e)
@@ -209,13 +216,18 @@ class Player extends Panel implements Runnable {
         }
 
         catch (Exception e) {}
+
+        return false;
     }
 
-    public synchronized void writeAudio()
+    public synchronized boolean writeAudio()
     {
         try
         {
             //TODO allow the writeAudio to do something in the background
+            if(done)
+                return false;
+
             while (!ready)
                 wait();
 
@@ -225,14 +237,14 @@ class Player extends Panel implements Runnable {
             //Once we get this we're done reading audio
             if(bytesRead == -1)
             {
-                return;
+                return false;
             }
 
             line.write(audioBuffer, 0, buffer.removeChunk());
 
             ready = false;
             notifyAll();
-            return;
+            return true;
         }
         catch (InterruptedException e)
         {
@@ -240,20 +252,25 @@ class Player extends Panel implements Runnable {
             e.printStackTrace();
             System.exit(1);
         }
+
+        return false;
     }
 
-    private class Producer extends Thread
+    private class Producer implements Runnable
     {
         synchronized public void run()
         {
-            for(int i = 0; i < length; i += oneSecond) {
-                readAudio();
+            for(int i = 0; i < length; i += oneSecond)
+            {
+                if(!readAudio()) {
+                    break;
+                }
             }
-            System.out.println("Done reading from file");
+            textarea.append("Done reading from file \n");
         }
     }
 
-    private class Consumer extends Thread
+    private class Consumer implements Runnable
     {
         synchronized public void run()
         {
@@ -266,11 +283,14 @@ class Player extends Panel implements Runnable {
                 volumeMin = volume.getMinimum();
                 line.start();
 
-                for(int i = 0; i < length; i += oneSecond) {
-                    writeAudio();
+                for(int i = 0; i < length; i += oneSecond)
+                {
+                    if(!writeAudio())
+                    {
+                        break;
+                    }
                 }
-                System.out.println("Done writing to device");
-
+                textarea.append("Done writing to device \n");
                 line.drain();
                 line.stop();
                 line.close();
