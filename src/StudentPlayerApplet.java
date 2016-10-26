@@ -32,8 +32,16 @@ class Player extends Panel implements Runnable {
     private int numBytesRead;
     private AudioFormat format;
     private DataLine.Info info;
+<<<<<<< HEAD
 
     //Volume Control Variables
+=======
+    private boolean ready = false;
+    private boolean done = false;
+    private int length;
+    private int oneSecond;
+    private BoundedBuffer buffer;
+>>>>>>> origin/master
     private FloatControl volume;
     float volumeMin;
     float volumeMax;
@@ -61,7 +69,12 @@ class Player extends Panel implements Runnable {
 
                 if(e.getActionCommand().toString().equals("x"))
                 {
+<<<<<<< HEAD
                     textfield.setText(" ");
+=======
+                    done = true;
+                    textarea.append("Shutting Down.. \n");
+>>>>>>> origin/master
                     textfield.setText("");
                     producer.stopProducer();
                     consumer.stopConsumer();
@@ -205,6 +218,13 @@ class Player extends Panel implements Runnable {
             t2.join();
             textarea.append("Threads Joined \n");
 
+<<<<<<< HEAD
+=======
+            producer.join();
+            consumer.join();
+            textarea.append("Threads Joined \n");
+
+>>>>>>> origin/master
 
         } catch (UnsupportedAudioFileException e ) {
             System.out.println("Player initialisation failed");
@@ -223,16 +243,30 @@ class Player extends Panel implements Runnable {
         }
     }
 
+<<<<<<< HEAD
     private class Producer implements Runnable
     {
         //local boolean to shut down thread
         boolean done = false;
+=======
+    public synchronized boolean readAudio()
+    {
+        try
+        {
+            if(done)
+                return false;
+
+            //TODO allow the readAudio to do something in the background
+            while(ready)
+                wait();
+>>>>>>> origin/master
 
         synchronized public void run()
         {
             //Check if it's done reading the file or ended prematurely
             while(!done && numBytesRead != -1)
             {
+<<<<<<< HEAD
                 try
                 {
                     //Read data to audio buffer and have the length of it send to numBytesRead
@@ -244,6 +278,16 @@ class Player extends Panel implements Runnable {
                 buffer.isDone();
             }
             textarea.append("Done reading from file \n");
+=======
+                return false;
+            }
+
+            buffer.insertChunk(bytesRead);
+
+            ready = true;
+            notifyAll();
+            return true;
+>>>>>>> origin/master
         }
 
         public void stopProducer()
@@ -251,6 +295,7 @@ class Player extends Panel implements Runnable {
             done = true;
         }
 
+<<<<<<< HEAD
     }
 
     private class Consumer implements Runnable
@@ -260,6 +305,65 @@ class Player extends Panel implements Runnable {
         boolean done = false;
         boolean paused = false;
 
+=======
+        catch (Exception e) {}
+
+        return false;
+    }
+
+    public synchronized boolean writeAudio()
+    {
+        try
+        {
+            //TODO allow the writeAudio to do something in the background
+            if(done)
+                return false;
+
+            while (!ready)
+                wait();
+
+            while(paused)
+                wait();
+
+            //Once we get this we're done reading audio
+            if(bytesRead == -1)
+            {
+                return false;
+            }
+
+            line.write(audioBuffer, 0, buffer.removeChunk());
+
+            ready = false;
+            notifyAll();
+            return true;
+        }
+        catch (InterruptedException e)
+        {
+            System.out.println("Thread Interrupted Exception");
+            e.printStackTrace();
+            System.exit(1);
+        }
+
+        return false;
+    }
+
+    private class Producer implements Runnable
+    {
+        synchronized public void run()
+        {
+            for(int i = 0; i < length; i += oneSecond)
+            {
+                if(!readAudio()) {
+                    break;
+                }
+            }
+            textarea.append("Done reading from file \n");
+        }
+    }
+
+    private class Consumer implements Runnable
+    {
+>>>>>>> origin/master
         synchronized public void run()
         {
             try
@@ -274,6 +378,7 @@ class Player extends Panel implements Runnable {
                 line.start();
                 byte [] audioData;
 
+<<<<<<< HEAD
                 while(!done)
                 {
                     try
@@ -307,6 +412,15 @@ class Player extends Panel implements Runnable {
                 }
 
                 //Close down line and exit thread
+=======
+                for(int i = 0; i < length; i += oneSecond)
+                {
+                    if(!writeAudio())
+                    {
+                        break;
+                    }
+                }
+>>>>>>> origin/master
                 textarea.append("Done writing to device \n");
                 line.drain();
                 line.stop();
