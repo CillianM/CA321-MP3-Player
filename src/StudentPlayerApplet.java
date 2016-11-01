@@ -4,7 +4,8 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 
-class Player extends Panel implements Runnable {
+class Player extends Panel implements Runnable
+{
     //Applet Variables
     private static final long serialVersionUID = 1L;
     private TextField textfield;
@@ -33,8 +34,9 @@ class Player extends Panel implements Runnable {
         * this requires us to use textfield.setText(" ") before textfield.setText("");
         * */
 
-        textfield.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) 
+        textfield.addActionListener(new ActionListener()
+        {
+            public void actionPerformed(ActionEvent e)
             {
 
                 if(e.getActionCommand().equals("x"))
@@ -44,7 +46,7 @@ class Player extends Panel implements Runnable {
                     producer.stopProducer();
                     consumer.stopConsumer();
                     buffer.stopBuffer();
-                    textarea.append("Shutting Down.. \n");
+                    textarea.append("Command received: Halt playback \n");
                 }
                 if(e.getActionCommand().equals("p"))
                 {
@@ -53,7 +55,7 @@ class Player extends Panel implements Runnable {
                         textfield.setText(" ");
                         textfield.setText("");
 
-                        textarea.append("Pausing Audio \n");
+                        textarea.append("Command received: Pausing playback \n");
                         consumer.pauseConsumer();
                     }
 
@@ -65,7 +67,7 @@ class Player extends Panel implements Runnable {
                         textfield.setText(" ");
                         textfield.setText("");
 
-                        textarea.append("Resumed Audio \n");
+                        textarea.append("Command received: Resuming playback \n");
                         consumer.paused = false;
                         buffer.resumeBuffer();
                     }
@@ -80,13 +82,13 @@ class Player extends Panel implements Runnable {
                     consumer.newVolume =  consumer.volume.getValue() + 1F;
 
                     //Ensure we don't go over the max volume
-                    if( consumer.newVolume <  consumer.volumeMax) 
+                    if( consumer.newVolume <  consumer.volumeMax)
                     {
                         consumer.volume.setValue( consumer.newVolume);
-                        textarea.append("Raised Volume \n");
+                        textarea.append("Command received: Raised Volume \n");
                     }
                     else
-                        textarea.append("Max Volume! \n");
+                        textarea.append("Command received: Max Volume! \n");
                 }
                 else if(e.getActionCommand().equals("a"))
                 {
@@ -97,32 +99,32 @@ class Player extends Panel implements Runnable {
                     consumer.newVolume =  consumer.volume.getValue() - 1F;
 
                     //Ensure we don't go under the min volume
-                    if(consumer.newVolume > consumer.volumeMin) 
+                    if(consumer.newVolume > consumer.volumeMin)
                     {
                         consumer.volume.setValue(consumer.newVolume);
-                        textarea.append("Lowered Volume \n");
+                        textarea.append("Command received: Lowered Volume \n");
                     }
                     else
-                        textarea.append("Min Volume! \n");
+                        textarea.append("Command received: Min Volume! \n");
                 }
                 else if(e.getActionCommand().equals("m"))
                 {
                     textfield.setText(" ");
                     textfield.setText("");
 
-                    if(!consumer.muted) 
+                    if(!consumer.muted)
                     {
                         //Save whatever the current volume level is
                         consumer.currentVolume = consumer.volume.getValue();
 
                         //Set volume to the lowest setting ==> "Muted"
                         consumer.volume.setValue(consumer.volumeMin);
-                        textarea.append("Muted Audio \n");
+                        textarea.append("Command received: Muted Audio \n");
                         consumer.muted = true;
                     }
                     else
                     {
-                        textarea.append("Already Muted! \n");
+                        textarea.append("Command received:  Already Muted! \n");
                     }
                 }
                 else if(e.getActionCommand().equals("u"))
@@ -134,12 +136,12 @@ class Player extends Panel implements Runnable {
                     {
                         //Set the volume back to the same volume it was when it was muted
                         consumer.volume.setValue(consumer.currentVolume);
-                        textarea.append("Unmuted Audio \n");
+                        textarea.append("Command received: Unmuted Audio \n");
                         consumer.muted = false;
                     }
                     else
                     {
-                        textarea.append("Audio Not Muted! \n");
+                        textarea.append("Command received: Audio Not Muted! \n");
                     }
                 }
             }
@@ -150,33 +152,38 @@ class Player extends Panel implements Runnable {
         new Thread(this).start();
     }
 
-    public void run() 
+    public void run()
     {
 
-        try {
+        try
+        {
             File file = new File(filename);
             AudioInputStream s = AudioSystem.getAudioInputStream(file);
             AudioFormat format;
             DataLine.Info info;
             format = s.getFormat();
             textarea.append("Audio format: " + format.toString() + "\n");
+            long audioFileLength = file.length();
+            int frameSize = format.getFrameSize();
+            float frameRate = format.getFrameRate();
+            float durationInSeconds = Math.round(audioFileLength / (frameSize * frameRate));
+            textarea.append("Audio file Duration: " + durationInSeconds + "\n");
 
             info = new DataLine.Info(SourceDataLine.class, format);
-            if (!AudioSystem.isLineSupported(info)) {
+            if (!AudioSystem.isLineSupported(info))
+            {
                 throw new UnsupportedAudioFileException();
             }
             SourceDataLine line = (SourceDataLine) AudioSystem.getLine(info);
             line.open(format);
 
-
             int oneSecond = (int) (format.getChannels() * format.getSampleRate() *
                     format.getSampleSizeInBits() / 8);
             buffer = new BoundedBuffer(oneSecond);
 
-
             //Once Audio format, readers and writers setup start the threads
-            producer = new Producer(s,buffer,new byte[oneSecond]);
-            consumer = new Consumer(line,buffer);
+            producer = new Producer(textarea,s,buffer,new byte[oneSecond]);
+            consumer = new Consumer(textarea,line,buffer);
             Thread t1 = new Thread(producer);
             Thread t2 = new Thread(consumer);
             t1.start();
@@ -184,7 +191,7 @@ class Player extends Panel implements Runnable {
 
             t1.join();
             t2.join();
-            textarea.append("Threads Joined \n");
+            textarea.append("Main says: playback complete \n");
         }
         catch (UnsupportedAudioFileException e )
         {
@@ -194,19 +201,19 @@ class Player extends Panel implements Runnable {
         }
         catch (IOException e)
         {
-            System.out.println("Player initialisation failed");
+            System.out.println("Player initialisation failed, IOException");
             e.printStackTrace();
             System.exit(1);
         }
         catch (InterruptedException e)
         {
-            System.out.println("Thread Interupted Exception");
+            System.out.println("Thread Interrupted Exception, InterruptedException");
             e.printStackTrace();
             System.exit(1);
         }
         catch (LineUnavailableException e)
         {
-            System.out.println("Player initialisation failed");
+            System.out.println("Player initialisation failed, LineUnavailableException");
             e.printStackTrace();
             System.exit(1);
         }
@@ -222,10 +229,12 @@ class Producer implements Runnable
     private AudioInputStream s;
     private BoundedBuffer buffer;
     private byte [] audioBuffer;
+    private TextArea textArea;
 
-    Producer(AudioInputStream s,BoundedBuffer buffer, byte [] audioBuffer)
+    Producer(TextArea textArea, AudioInputStream s,BoundedBuffer buffer, byte [] audioBuffer)
     {
         this.s = s;
+        this.textArea = textArea;
         this.buffer = buffer;
         this.audioBuffer = audioBuffer;
     }
@@ -241,11 +250,16 @@ class Producer implements Runnable
                 numBytesRead = s.read(audioBuffer);
                 buffer.insertChunk(audioBuffer);
             }
-            catch (Exception e) {}
+            catch (Exception e)
+            {
+                System.out.println("Exception occurred");
+                e.printStackTrace();
+                System.exit(1);
+            }
 
             buffer.isDone();
         }
-        System.out.println("Done reading from file \n");
+        textArea.append("Producer says: goodbye \n");
     }
 
     void stopProducer()
@@ -262,19 +276,21 @@ class Consumer implements Runnable
 
     //boolean to shut down thread and to pause consumer
     //=> No need to shut down producer as it can fill up the buffer while it's waiting
-    boolean done = false;
+    private boolean done = false;
     boolean paused = false;
     FloatControl volume;
+    private TextArea textArea;
     float volumeMin;
     float volumeMax;
     float newVolume;
     float currentVolume;
     boolean muted = false;
 
-    Consumer(SourceDataLine line,BoundedBuffer buffer)
+    Consumer(TextArea textArea,SourceDataLine line,BoundedBuffer buffer)
     {
         this.line = line;
         this.buffer = buffer;
+        this.textArea = textArea;
         //set up volume control
         volume = (FloatControl) line.getControl(FloatControl.Type.MASTER_GAIN);
         volumeMax = volume.getMaximum();
@@ -324,7 +340,7 @@ class Consumer implements Runnable
         }
 
         //Close down line and exit thread
-        System.out.println("Done writing to device \n");
+        textArea.append("Consumer says: goodbye \n");
         line.drain();
         line.stop();
         line.close();
@@ -352,7 +368,6 @@ class BoundedBuffer
     private int occupied = 0;
     private int oneSecond;
     private byte [] oneSecondBlock;
-    private byte[] outs;
     private boolean dataAvailable;
     private byte [] bufferArray;
 
@@ -369,8 +384,8 @@ class BoundedBuffer
 
     synchronized void insertChunk(byte [] data)
     {
-        //System.out.println("Inserted at " + ((nextIn + (data.length -1) % (oneSecond * 10)) + " and occupied is " + occupied));
-        try {
+        try
+        {
             //if there is no spaces then wait
             while (occupied == 10) wait();
 
@@ -389,15 +404,12 @@ class BoundedBuffer
             e.printStackTrace();
             System.exit(1);
         }
-
-
     }
 
     synchronized byte[] removeChunk()
     {
         //get a new array of bytes to send out
-        outs = new byte[oneSecond];
-        //System.out.println("Removed at " + ((nextOut + (oneSecondBlock.length - 1)) % (oneSecond * 10)) + " and occupied is " + occupied);
+        byte[] outs = new byte[oneSecond];
         try
         {
             //if there is nothing to take and if we've ended then return a null
@@ -463,7 +475,7 @@ class BoundedBuffer
 public class StudentPlayerApplet extends Applet
 {
     private static final long serialVersionUID = 1L;
-    public void init() 
+    public void init()
     {
         setLayout(new BorderLayout());
         add(BorderLayout.CENTER, new Player(getParameter("file")));
