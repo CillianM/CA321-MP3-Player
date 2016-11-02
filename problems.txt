@@ -1,0 +1,7 @@
+When we call pause on our consumer pause, it will continue to play the audio chunk its currently on then pause. 
+We believe this is a nonblockable io so it cannot be interupted once in progress.
+However once it is finished with that chunk it successfully pauses and is able to resume from the next chunk.
+
+We discovered that upon pausing the audio and then attempting to exit that while the producer thread will shutdown gracefully,
+the consumer thread is paused which in turn pauses the Boundedbuff through their associated booleans. This will prevent the consumer
+thread from exiting until the playback is resumed. Once its resumed the consumer proceeds to successfully shut down gracefully.

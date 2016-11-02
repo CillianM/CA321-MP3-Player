@@ -1,0 +1,27 @@
+BoundedBuffer
+	We created a BoundedBuffer class that would allow us to hold 10 "chunks" of 1 second worth of audio
+	to help us implement the producer/consumer model queue. Using two pointers we were able to "write" and "read" 
+	to the BoundedBuffer, the "occupied" int variable keeps watch on the current space available in the BoundedBuffer.
+	We instantiated a byte array of 10 x 1 seconds to hold the audio calculated using the channel and format bitrate.
+
+
+Synchronised/producer/consumer
+	We then created our producer/consumer classes which implement runnable and have each a synchronised run method as required.
+	These are responsible for adding and removing the audio chunk data from the BoundedBuffer object. 
+
+	The consumer will continue to read	in data and write it to the audio device through the jvm and then a sys call, until the BoundedBuffer object returns a null. The Consumer thread will also put itself to sleep if the BoundedBuffer is empty. This is triggered if occupied = 0. 
+
+	The Producer thread will write to the BoundedBuffer until there either is no more data from the file or Buffer is full. When the buffer is full the producer thread will be put to sleep and wait on a notify all from the BoundedBuffer. The Producer Thread will pause itself when occupied = 10, or there is no more data from the .wav/.mp3 file to write to the buffer.
+
+
+Gracefully "killed" threads
+	There are two scenarios where the threads will be politely killed, one where we ask it "x", and the other when no audio is left to read or write.
+	So in the case that we want to end prematurely "x", the "done" boolean is set to true for both the producer and the consumer, then the occupied is set to zero to stop the BoundedBuffer thread and this in turn notifies all in case they are about to remove or add from the buffer. So the threads finish and return back to the main player, letting the threads die peacefully in their sleep. 
+
+	If its a "natural" stop the producer will reach the end of the audio file and call to the isDone method in BoundedBuffer, setting dataAvailable is false. This in turn will the consumer know that there is no more data available and let it break out of its loop of playing audio, letting it inform us that it is done and closing the audio line. The threads will then return to the main and end.
+
+
+
+Implemented keystroke control + additional booleans 
+	For the extra shiney credit we supported the extra keyboard calls. The pause and resume methods are synchronized and are controlled through calling the pauseConsumer() which in turn calls to pauseBuffer, which both set their respective pause booleans to true. The volume controls are controlled
+    using sourceDataLine's master gain and float increments, using these we can increase, decrease, mute or unmute the audio.
