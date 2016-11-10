@@ -75,74 +75,86 @@ class Player extends Panel implements Runnable
                 }
                 else if(e.getActionCommand().equals("q"))
                 {
-                    textfield.setText(" ");
-                    textfield.setText("");
+					if(consumer.supported)
+					{
+		                textfield.setText(" ");
+		                textfield.setText("");
 
-                    //Increment current volume level by 1
-                    consumer.newVolume =  consumer.volume.getValue() + 1F;
+		                //Increment current volume level by 1
+		                consumer.newVolume =  consumer.volume.getValue() + 1F;
 
-                    //Ensure we don't go over the max volume
-                    if( consumer.newVolume <  consumer.volumeMax)
-                    {
-                        consumer.volume.setValue( consumer.newVolume);
-                        textarea.append("Command received: Raised Volume \n");
-                    }
-                    else
-                        textarea.append("Command received: Max Volume! \n");
+		                //Ensure we don't go over the max volume
+		                if( consumer.newVolume <  consumer.volumeMax)
+		                {
+		                    consumer.volume.setValue( consumer.newVolume);
+		                    textarea.append("Command received: Raised Volume \n");
+		                }
+		                else
+		                    textarea.append("Command received: Max Volume! \n");
+					}
                 }
                 else if(e.getActionCommand().equals("a"))
                 {
-                    textfield.setText(" ");
-                    textfield.setText("");
+					if(consumer.supported)
+					{
+		                textfield.setText(" ");
+		                textfield.setText("");
 
-                    //Decrement current volume by one
-                    consumer.newVolume =  consumer.volume.getValue() - 1F;
+		                //Decrement current volume by one
+		                consumer.newVolume =  consumer.volume.getValue() - 1F;
 
-                    //Ensure we don't go under the min volume
-                    if(consumer.newVolume > consumer.volumeMin)
-                    {
-                        consumer.volume.setValue(consumer.newVolume);
-                        textarea.append("Command received: Lowered Volume \n");
-                    }
-                    else
-                        textarea.append("Command received: Min Volume! \n");
+		                //Ensure we don't go under the min volume
+		                if(consumer.newVolume > consumer.volumeMin)
+		                {
+		                    consumer.volume.setValue(consumer.newVolume);
+		                    textarea.append("Command received: Lowered Volume \n");
+		                }
+		                else
+		                    textarea.append("Command received: Min Volume! \n");
+					}
                 }
                 else if(e.getActionCommand().equals("m"))
                 {
-                    textfield.setText(" ");
-                    textfield.setText("");
+					if(consumer.supported)
+					{
+						    textfield.setText(" ");
+						    textfield.setText("");
 
-                    if(!consumer.muted)
-                    {
-                        //Save whatever the current volume level is
-                        consumer.currentVolume = consumer.volume.getValue();
+						    if(!consumer.muted)
+						    {
+						        //Save whatever the current volume level is
+						        consumer.currentVolume = consumer.volume.getValue();
 
-                        //Set volume to the lowest setting ==> "Muted"
-                        consumer.volume.setValue(consumer.volumeMin);
-                        textarea.append("Command received: Muted Audio \n");
-                        consumer.muted = true;
-                    }
-                    else
-                    {
-                        textarea.append("Command received:  Already Muted! \n");
-                    }
+						        //Set volume to the lowest setting ==> "Muted"
+						        consumer.volume.setValue(consumer.volumeMin);
+						        textarea.append("Command received: Muted Audio \n");
+						        consumer.muted = true;
+						    }
+						    else
+						    {
+						        textarea.append("Command received:  Already Muted! \n");
+						    }
+					}
                 }
                 else if(e.getActionCommand().equals("u"))
                 {
-                    textfield.setText(" ");
-                    textfield.setText("");
+					if(consumer.supported)
+					{
+		                textfield.setText(" ");
+		                textfield.setText("");
 
-                    if(consumer.muted)
-                    {
-                        //Set the volume back to the same volume it was when it was muted
-                        consumer.volume.setValue(consumer.currentVolume);
-                        textarea.append("Command received: Unmuted Audio \n");
-                        consumer.muted = false;
-                    }
-                    else
-                    {
-                        textarea.append("Command received: Audio Not Muted! \n");
-                    }
+		                if(consumer.muted)
+		                {
+		                    //Set the volume back to the same volume it was when it was muted
+		                    consumer.volume.setValue(consumer.currentVolume);
+		                    textarea.append("Command received: Unmuted Audio \n");
+		                    consumer.muted = false;
+		                }
+		                else
+		                {
+		                    textarea.append("Command received: Audio Not Muted! \n");
+		                }
+					}
                 }
             }
         });
@@ -285,6 +297,7 @@ class Consumer implements Runnable
     float newVolume;
     float currentVolume;
     boolean muted = false;
+    boolean supported = false;
 
     Consumer(TextArea textArea,SourceDataLine line,BoundedBuffer buffer)
     {
@@ -292,9 +305,17 @@ class Consumer implements Runnable
         this.buffer = buffer;
         this.textArea = textArea;
         //set up volume control
-        volume = (FloatControl) line.getControl(FloatControl.Type.MASTER_GAIN);
-        volumeMax = volume.getMaximum();
-        volumeMin = volume.getMinimum();
+		if(line.isControlSupported(FloatControl.Type.MASTER_GAIN))
+		{
+			supported = true;
+			volume = (FloatControl) line.getControl(FloatControl.Type.MASTER_GAIN);
+			volumeMax = volume.getMaximum();
+			volumeMin = volume.getMinimum();
+		}
+		else
+		{
+			textArea.append("Audio Controls Not Supported On This Version of java \n");
+		}
     }
 
     synchronized public void run()
