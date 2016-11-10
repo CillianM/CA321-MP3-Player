@@ -5,3 +5,8 @@ However once it is finished with that chunk it successfully pauses and is able t
 We discovered that upon pausing the audio and then attempting to exit that while the producer thread will shutdown gracefully,
 the consumer thread is paused which in turn pauses the Boundedbuff through their associated booleans. This will prevent the consumer
 thread from exiting until the playback is resumed. Once its resumed the consumer proceeds to successfully shut down gracefully.
+
+Java 8u11 bug requires text fields to be set as something before it's emptied
+this requires us to use textfield.setText(" ") before textfield.setText("");
+
+When testing our program on the lab machines we diecovered that they have OpenJDK installed.  We encountered a bug where FloatControl.Type.MASTER_GAIN is not supported, which we use to control the volume of the applet.  As a work around we check to see if MASTER_GAIN is supported, if not we disable the volume control feature.
